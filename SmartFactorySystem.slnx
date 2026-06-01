@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Application/">
+    <Project Path="Application/SmartFactorySystem.Application.csproj" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="Infrastructure/SmartFactorySystem.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="Presentation/SmartFactorySystem.Presentation.csproj" />
+  </Folder>
+</Solution>
