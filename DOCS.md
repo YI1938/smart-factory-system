@@ -1,101 +1,8 @@
-SmartFactorySystem — ドキュメント
-
-**概要**
-
-このリポジトリは、シンプルな生産ライン監視サンプルです。3 層アーキテクチャ（Application / Infrastructure / Presentation）で構成され、設備の状態管理、停止理由の保持、実績（良品／不良品）の記録を行います。
-
-**プロジェクト構成（主要ファイル）**
-
-- Solution: [SmartFactorySystem.slnx](SmartFactorySystem.slnx)
-- Application/
-  - [Class1.cs](Application/Class1.cs)
-  - [IMachineRepository.cs](Application/IMachineRepository.cs)
-  - [MachineService.cs](Application/MachineService.cs)
-  - [MachineStatus.cs](Application/MachineStatus.cs)
-  - [SmartFactorySystem.Application.csproj](Application/SmartFactorySystem.Application.csproj)
-- Infrastructure/
-  - [Class1.cs](Infrastructure/Class1.cs)
-  - [FactoryDbContext.cs](Infrastructure/FactoryDbContext.cs)
-  - [MachineRepository.cs](Infrastructure/MachineRepository.cs)
-  - [Migrations/](Infrastructure/Migrations/)
-  - [SmartFactorySystem.Infrastructure.csproj](Infrastructure/SmartFactorySystem.Infrastructure.csproj)
-- Presentation/
-  - [appsettings.json](Presentation/appsettings.json)
-  - [appsettings.Development.json](Presentation/appsettings.Development.json)
-  - [Program.cs](Presentation/Program.cs)
-  - Components/
-    - Layout: [MainLayout.razor](Presentation/Components/Layout/MainLayout.razor), [NavMenu.razor](Presentation/Components/Layout/NavMenu.razor)
-    - Pages: [MachineList.razor](Presentation/Components/Pages/MachineList.razor), [Home.razor](Presentation/Components/Pages/Home.razor)
-  - [SmartFactorySystem.Presentation.csproj](Presentation/SmartFactorySystem.Presentation.csproj)
-
-**各ファイルの役割（要点）**
-
-**Application**
-- **`IMachineRepository`**: [Application/IMachineRepository.cs](Application/IMachineRepository.cs)
-  - データアクセスの抽象インターフェース。`GetAllAsync()`, `GetByIdAsync(id)`, `UpdateStatusAsync(id, status, stopReason?)`, `RecordProductionAsync(id, addedCount, addedDefectCount)` を定義します。
-- **`MachineService`**: [Application/MachineService.cs](Application/MachineService.cs) / [Application/MachineStatus.cs](Application/MachineStatus.cs)
-  - ビジネスロジック層。リポジトリを介して設備情報を取得・更新します。
-  - 主な公開メソッド例: `GetMachinesAsync()`, `UpdateMachineStatusAsync(id, status, [stopReason])`, `RecordProductionAsync(id, addedCount, addedDefectCount)`。
-  - 更新時にログ出力を行い、異常 (`Error`) や停止 (`PlannedStop` / `UnplannedStop`) を注意喚起します。
-- **モデル（MachineStatus）**:
-  - スキーマはマイグレーションに定義されていますが、主なプロパティは `Id`, `MachineId`, `MachineName`, `Status`, `StopReason`, `PlannedProductionCount`, `ActualProductionCount`, `DefectCount`, `LastUpdated`, `LastStatusChangedAt` です（詳細は [Infrastructure/Migrations/FactoryDbContextModelSnapshot.cs](Infrastructure/Migrations/FactoryDbContextModelSnapshot.cs) を参照）。
-  - 注意: リポジトリ内にファイル名と実装が一致しない箇所（例: `Application/MachineStatus.cs` に `MachineService` 実装が含まれている等）があるため、可読性向上のためファイル整理を検討してください。
-
-**Infrastructure**
-- **`FactoryDbContext`**: [Infrastructure/FactoryDbContext.cs](Infrastructure/FactoryDbContext.cs)
-  - EF Core の DbContext。`DbSet<MachineStatus>` を公開し、エンティティのプロパティ制約（長さや必須）とシードデータ（サンプル3件）を定義します。
-- **`MachineRepository`**: [Infrastructure/MachineRepository.cs](Infrastructure/MachineRepository.cs)
-  - `IMachineRepository` の具象実装。
-  - 主なメソッド: `GetAllAsync()`（一覧取得）、`GetByIdAsync(id)`（単一取得）、`UpdateStatusAsync(id, status, stopReason?)`（状態と停止理由の更新、`LastStatusChangedAt` の更新ロジック含む）、`RecordProductionAsync(id, addedCount, addedDefectCount)`（実績と不良数を加算）。
-- **`Migrations/`**
-  - EF Core マイグレーション定義とスナップショット。DB スキーマと初期データが含まれます。
-
-**Presentation (Blazor)**
-- **`Program.cs`**: [Presentation/Program.cs](Presentation/Program.cs)
-  - アプリケーション起動設定。`AddDbContext<FactoryDbContext>`（SQLite）、DI 登録（`IMachineRepository` → `MachineRepository`、`MachineService`）、Razor Components / Blazor 設定、起動時に `db.Database.Migrate()` を呼んで自動マイグレーションを適用します。
-- **UI ページ**: [Presentation/Components/Pages/MachineList.razor](Presentation/Components/Pages/MachineList.razor)
-  - `MachineService` を注入して機器一覧を取得・表示します。
-  - ボタン操作で `UpdateMachineStatusAsync()` を呼び、変更後にデータを再ロードします。
-
-**主要なワークフロー（例）**
-- UI (`MachineList.razor`) が `MachineService.GetMachinesAsync()` を呼んで一覧を取得。
-- ユーザー操作で `MachineService.UpdateMachineStatusAsync(id, status, stopReason?)` が呼ばれ、内部で `IMachineRepository.UpdateStatusAsync(...)` が DB を更新。
-- センサーや外部システムから `RecordProductionAsync(...)` が呼ばれる設計（`MachineRepository.RecordProductionAsync` が `ActualProductionCount` / `DefectCount` を加算）。
-
-**ビルドと実行**
-
-ルートで依存復元とビルド:
-
-```bash
-dotnet restore
-dotnet build
-```
-
-Presentation を実行:
-
-```bash
-dotnet run --project Presentation/SmartFactorySystem.Presentation.csproj
-```
-
-マイグレーション適用（必要時）:
-
-```bash
-dotnet ef database update --project Infrastructure --startup-project Presentation
-```
-
-**注意点・改善提案**
-- `Application` 内のモデル定義がマイグレーション由来になっているため、`Application` 側に `MachineStatus` の明示的な POCO クラスを置くと可読性と型補完が改善します。
-- `Program.cs` が起動時に DB マイグレーションを自動実行するため、開発中はローカル DB のバックアップや環境分離に注意してください。
-- ファイル名と実装が一致しない箇所（例: `Application/MachineStatus.cs` の内容）を整理すると保守性が向上します。
-
----
-
-この `DOCS.md` を元に、必要であれば README の補足やサンプル API、スクリーンショットを追加します。次に何をしますか？（ビルド・起動／モデル追加／README 拡張 など）
-概要
+## 概要
 
 このリポジトリは、シンプルな生産ライン監視（Production Monitoring）サンプルです。3 層アーキテクチャ（Application / Infrastructure / Presentation）で構成され、設備の稼働状態、停止理由、実績を管理します。
 
-プロジェクト構成（主要ファイル）
+## プロジェクト構成（主要ファイル）
 
 - [SmartFactorySystem.slnx](SmartFactorySystem.slnx)
 - Application/
@@ -121,7 +28,7 @@ dotnet ef database update --project Infrastructure --startup-project Presentatio
         - Pages: [MachineList.razor](Presentation/Components/Pages/MachineList.razor), [Home.razor](Presentation/Components/Pages/Home.razor)
     - [SmartFactorySystem.Presentation.csproj](Presentation/SmartFactorySystem.Presentation.csproj)
 
-各ファイルの役割と動作（要点）
+## 各ファイルの役割と動作（要点）
 
 - ソリューション
     - `SmartFactorySystem.slnx`: 3 プロジェクトを束ねる Visual Studio / dotnet ソリューション。
@@ -157,7 +64,7 @@ dotnet ef database update --project Infrastructure --startup-project Presentatio
         - `MachineService` を注入し、`GetMachinesAsync()` でロード、ボタンで `UpdateMachineStatusAsync()` を呼び出して状態更新を行い、再ロードする。
     - レイアウト・共通コンポーネント（ナビ・Reconnect モーダルなど）は UI とリアルタイム再接続挙動を補助します。
 
-ビルドと実行手順
+## ビルドと実行手順
 
 1. リポジトリルートで復元とビルド:
 
@@ -177,15 +84,3 @@ dotnet run --project Presentation/SmartFactorySystem.Presentation.csproj
 ```bash
 dotnet ef database update --project Infrastructure --startup-project Presentation
 ```
-
-補足と提案
-
-- 開発中の注意点:
-    - `MachineStatus` のソースクラスが明示的に存在しない場合は、Application 内にモデルクラスを追加すると可読性と IDE 補完が向上します（現在はマイグレーションでスキーマが確認できます）。
-    - `Presentation/Program.cs` は起動時に DB マイグレーションを自動で実行するため、データベースの内容が変更されます。ローカルで試す場合はバックアップに注意してください。
-
-- 次に行えます:
-    - README にサンプル API 呼び出し例やスクリーンショットを追加しますか？
-    - ローカルでビルドと起動を代行して結果を報告しますか？
-
-必要なら、上記のいずれかを続けて実行します。
