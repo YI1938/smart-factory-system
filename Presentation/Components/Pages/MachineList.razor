@@ -5,63 +5,102 @@
 
 @inject MachineService MachineService
 
-<h3>生産ライン稼働状況</h3>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold">📊 生産ライン稼働モニター</h3>
+    <button class="btn btn-outline-primary shadow-sm" @onclick="LoadData">
+        <i class="bi bi-arrow-clockwise"></i> 最新化
+    </button>
+</div>
 
 @if (machines == null)
 {
-    <p>読み込み中...</p>
+    <div class="d-flex justify-content-center mt-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">読み込み中...</span>
+        </div>
+    </div>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>設備ID</th>
-                <th>設備名</th>
-                <th>状態</th>
-                <th>最終更新</th>
-                <th>操作</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var machine in machines)
-            {
+    <div class="table-responsive shadow-sm rounded bg-white p-2">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
                 <tr>
-                    <td>@machine.MachineId</td>
-                    <td>@machine.MachineName</td>
-                    <td>
-                        @switch(machine.Status)
-                        {
-                            case "Running":
-                                <span class="badge bg-success">稼働中</span>
-                                break;
-                            case "Stopped":
-                                <span class="badge bg-secondary">停止</span>
-                                break;
-                            case "Error":
-                                <span class="badge bg-danger">異常</span>
-                                break;
-                        }
-                    </td>
-                    <td>@machine.LastUpdated.ToLocalTime()</td>
-                    <td>
-                        <button class="btn btn-success btn-sm me-1"
-                                @onclick='() => UpdateStatus(machine.Id, "Running")'>
-                            稼働
-                        </button>
-                        <button class="btn btn-warning btn-sm me-1"
-                                @onclick='() => UpdateStatus(machine.Id, "Stopped")'>
-                            停止
-                        </button>
-                        <button class="btn btn-danger btn-sm"
-                                @onclick='() => UpdateStatus(machine.Id, "Error")'>
-                            異常
-                        </button>
-                    </td>
+                    <th style="width: 20%;">設備</th>
+                    <th style="width: 15%;">ステータス</th>
+                    <th style="width: 25%;">生産進捗 (実績 / 計画)</th>
+                    <th style="width: 15%;">品質 (良品率)</th>
+                    <th style="width: 10%;">継続時間</th>
+                    <th style="width: 15%;">操作（デモ用）</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var machine in machines)
+                {
+                    <tr>
+                        <td>
+                            <strong class="text-primary">@machine.MachineName</strong><br/>
+                            <small class="text-muted">@machine.MachineId</small>
+                        </td>
+                        
+                        <td>
+                            @GetStatusBadge(machine)
+                            @if (!string.IsNullOrEmpty(machine.StopReason))
+                            {
+                                <div class="small text-danger mt-1 fw-bold">
+                                    <i class="bi bi-exclamation-circle"></i> @machine.StopReason
+                                </div>
+                            }
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>@machine.ActualProductionCount / @machine.PlannedProductionCount 個</span>
+                                <strong>@machine.ProgressRate.ToString("0.0")%</strong>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar @GetProgressBarClass(machine.ProgressRate)" 
+                                     role="progressbar" 
+                                     style="width: @Math.Min(100, machine.ProgressRate)%;" 
+                                     aria-valuenow="@machine.ProgressRate" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <div class="fw-bold @(machine.QualityRate < 95 ? "text-danger" : "text-success")">
+                                @machine.QualityRate.ToString("0.0")%
+                            </div>
+                            <small class="text-muted">不良: @machine.DefectCount 個</small>
+                        </td>
+                        
+                        <td>
+                            <span class="badge bg-light text-dark border">
+                                @GetElapsedTime(machine.LastStatusChangedAt)
+                            </span>
+                        </td>
+                        
+                        <td>
+                            <div class="btn-group shadow-sm" role="group">
+                                <button class="btn btn-outline-success btn-sm"
+                                        @onclick='() => UpdateStatus(machine.Id, "Running", null)'>
+                                    稼働
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm"
+                                        @onclick='() => UpdateStatus(machine.Id, "PlannedStop", "型替え（段取り）")'>
+                                    段取
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm"
+                                        @onclick='() => UpdateStatus(machine.Id, "Error", "設備異常（要確認）")'>
+                                    異常
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
@@ -77,9 +116,50 @@ else
         machines = await MachineService.GetMachinesAsync();
     }
 
-    private async Task UpdateStatus(int id, string status)
+    private async Task UpdateStatus(int id, string status, string? reason)
     {
-        await MachineService.UpdateMachineStatusAsync(id, status);
+        await MachineService.UpdateMachineStatusAsync(id, status, reason);
         await LoadData();
+    }
+
+    // --- 画面描画用のC#ヘルパーメソッド ---
+    
+    // ステータスに応じたバッジを生成（BlazorならではのRenderFragment活用）
+    private RenderFragment GetStatusBadge(MachineStatus machine) => __builder =>
+    {
+        switch (machine.Status)
+        {
+            case "Running":
+                <span class="badge bg-success"><i class="bi bi-play-circle me-1"></i>稼働中</span>
+                break;
+            case "PlannedStop":
+                <span class="badge bg-warning text-dark"><i class="bi bi-pause-circle me-1"></i>計画停止</span>
+                break;
+            case "UnplannedStop":
+            case "Error":
+                <span class="badge bg-danger shadow-sm"><i class="bi bi-exclamation-triangle me-1"></i>異常停止</span>
+                break;
+            default:
+                <span class="badge bg-secondary">不明</span>
+                break;
+        }
+    };
+
+    // 進捗に応じたプログレスバーの色変更
+    private string GetProgressBarClass(double rate)
+    {
+        if (rate >= 100) return "bg-success";
+        if (rate >= 80) return "bg-primary";
+        if (rate >= 50) return "bg-info";
+        return "bg-secondary";
+    }
+
+    // 状態が変化してからの経過時間を計算（工場長が一番気にする「どれくらい止まってる？」を可視化）
+    private string GetElapsedTime(DateTime changedAt)
+    {
+        var span = DateTime.UtcNow - changedAt;
+        if (span.TotalHours >= 1)
+            return $"{(int)span.TotalHours}時間 {span.Minutes}分";
+        return $"{span.Minutes}分";
     }
 }
