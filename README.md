@@ -49,7 +49,7 @@ dotnet tool install --global dotnet-ef
 
 # データベースを生成
 dotnet ef database update --project Infrastructure --startup-project Presentation
-'''
+```
 
 ### 3. アプリケーションの実行
 dotnet run --project Presentation/SmartFactorySystem.Presentation.csproj
