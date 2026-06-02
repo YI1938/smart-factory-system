@@ -3,6 +3,43 @@
 ## 📝 プロジェクト概要
 本システムは、製造現場における「設備稼働の不透明さ」を解消し、**OEE（設備総合効率）の向上**を支援するためのダッシュボードシステムです。 
 単なる状態表示に留まらず、停止理由の分析や生産進捗のリアルタイム可視化を三層アーキテクチャで実装しています。
+
+---
+
+## 🚀 デプロイ環境（デモURL）
+
+本アプリケーションは Azure Container Apps (ACA) 上に構築・公開されています。
+
+* **アプリケーションURL:** [https://smart-factory-app.delightfulpond-cf5b8b52.japaneast.azurecontainerapps.io](https://smart-factory-app.delightfulpond-cf5b8b52.japaneast.azurecontainerapps.io)
+
+> 💡 **閲覧について:**  
+> 現在はセキュリティ保護のため一般アクセスを遮断しています。実際の稼働画面やAzureでのデータ受信ログについては、以下の**【稼働エビデンス（スクリーンショット）】**、または [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) をご参照ください。
+
+### 📸 稼働エビデンス（スクリーンショット）
+
+現在はインフラ保護（IP制限）のため外部アクセスを遮断していますが、Azure Container Apps 上でシステム全体が正常に稼働しているエビデンスを以下に公開します。
+
+#### ① 工場全体サマリー（ダッシュボード）
+アプリケーションのトップ画面です。総設備数、稼働状況、異常停止中のアラート件数や全体進捗率をリアルタイムに集計・可視化します。
+![工場全体サマリー](./images/dashboard_summary.jpeg)
+
+#### ② 生産ライン稼働モニター
+各ライン（A〜Cライン）の設備ステータス、生産進捗（実績／計画）、良品率、継続稼働時間を一覧表示する画面です。デモ操作用のボタンを配し、ステータスの模擬変更が可能です。
+![生産ライン稼働モニター](./images/production_monitor.jpeg)
+
+#### ③ 生産実績分析（次期拡張スペース）
+過去の生産実績データから稼働率（OEE）の推移や停止理由の内訳比率をチャート分析するためのフロントエンド基盤です。
+![生産実績分析](./images/production_analytics.jpeg)
+
+#### ④ 保全・エラー履歴画面（Azureリアルタイム監視稼働中）
+Application Insights との連携が有効化されている運用画面です。この画面のロードやインシデント発生をトリガーとして、テレメトリデータが即座にAzureへパケット送信されます。
+![保全・エラー履歴画面](./images/maintenance_view.jpeg)
+
+#### ⑤ Azure Application Insights でのカスタムイベント受信ログ
+上記の保全画面から送信されたカスタムイベント（`MachineMaintenanceRequired`）を、AzureポータルのLog Analytics上でKQLクエリ（`customEvents`）を用いて抽出した結果です。
+C#コード側で付与したカスタムディメンション（`MachineId: CNC-01`、`ISA95_Level: Level 2 (Sensing)` 等）が一言一句狂わずにクラウド側へ到達し、構造化ログとしてインデックス化されていることを証明しています。
+![Azureログ成功エビデンス](./images/azure_log_success.jpeg)
+
 ---
 ## 📚 開発・運用ドキュメント
 
