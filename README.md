@@ -13,7 +13,7 @@
 * **アプリケーションURL:** [https://smart-factory-app.delightfulpond-cf5b8b52.japaneast.azurecontainerapps.io](https://smart-factory-app.delightfulpond-cf5b8b52.japaneast.azurecontainerapps.io)
 
 > 💡 **閲覧について:**  
-> 現在はセキュリティ保護のため一般アクセスを遮断しています。実際の稼働画面やAzureでのデータ受信ログについては、以下の**【稼働エビデンス（スクリーンショット）】**、または [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) をご参照ください。
+> 現在はセキュリティ保護のため一般アクセスを遮断しています。実際の稼働画面やAzureでのデータ受信ログについては、以下の【稼働エビデンス（スクリーンショット）】、または [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) をご参照ください。
 
 ### 📸 稼働エビデンス（スクリーンショット）
 
