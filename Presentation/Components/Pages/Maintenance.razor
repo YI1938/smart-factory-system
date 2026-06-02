@@ -1,8 +1,11 @@
 @page "/maintenance"
+@using Microsoft.ApplicationInsights
+@using Microsoft.ApplicationInsights.DataContracts
+@inject TelemetryClient TelemetryClient
 
-<h3 class="fw-bold">🛠 保全・エラー履歴（準備中）</h3>
-<div class="alert alert-warning shadow-sm">
-    <i class="bi bi-exclamation-triangle-fill"></i> 設備で発生した異常の履歴と、それに対して誰がどのような保全対応を行ったかのログを管理する画面です。
+<h3 class="fw-bold">🛠 保全・エラー履歴（監視稼働中）</h3>
+<div class="alert alert-info shadow-sm">
+    <i class="bi bi-shield-check"></i> 現在、Application Insightsによるリアルタイム監視が有効です。異常検知データは自動的にAzureへ転送されます。
 </div>
 
 <div class="card shadow-sm mt-4">
@@ -17,10 +20,36 @@
                 </tr>
             </thead>
             <tbody>
+                @* 本来はDBから取得しますが、今回はシミュレーションとして1行表示 *@
                 <tr>
-                    <td colspan="4" class="text-center p-5 text-muted">履歴データはまだありません</td>
+                    <td>2026-06-02 10:00</td>
+                    <td>CNC-Router-01</td>
+                    <td>冷却ファン回転数異常</td>
+                    <td><span class="badge bg-danger">未対応</span></td>
                 </tr>
             </tbody>
         </table>
     </div>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // 画面が読み込まれた際、シミュレーションとして「異常検知イベント」を送信
+        var properties = new Dictionary<string, string> 
+        { 
+            { "MachineId", "CNC-01" },
+            { "ErrorType", "CoolingFanFailure" },
+            { "Location", "Nagoya-Plant-Line1" },
+            { "ISA95_Level", "Level 2 (Sensing)" }
+        };
+
+        // Azure Application Insightsにカスタムイベントを飛ばす
+        TelemetryClient.TrackEvent("MachineMaintenanceRequired", properties);
+        
+        // ログとしても詳細を残す
+        TelemetryClient.TrackTrace("Maintenance page accessed: Monitoring event triggered.", SeverityLevel.Information);
+
+        // ※本来はここで DB からエラー履歴を取得するロジックが入ります
+    }
+}
