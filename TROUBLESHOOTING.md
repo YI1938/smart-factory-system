@@ -4,6 +4,18 @@
 
 ---
 
+## 🚀 新機能：Application Insights による運用監視の導入 (feat)
+
+### 目的・背景
+ISA-95の垂直統合モデルに基づき、現場（Level 2 / Sensing）で発生したエラーや設備のインシデント情報を、クラウド上の上位層（Level 4）へリアルタイムに転送・可視化し、一元管理できる仕組みを検証するため。
+
+### 実装内容
+- **パッケージ導入:** `Microsoft.ApplicationInsights.AspNetCore` をプロジェクトへ追加。
+- **テレメトリ送信の実装:** 監視稼働中の保全画面（`Maintenance.razor`）が読み込まれた際、`TelemetryClient` を用いてカスタムイベント（`MachineMaintenanceRequired`）を発行。
+- **メタデータの付与:** 収集データに `MachineId`、`ErrorType`、`Location`、`ISA95_Level` などのカスタムディメンションを付与し、Azureポータルのログ（Log Analytics / KQLクエリ）から正確な絞り込み分析を行える構成を構築。
+
+---
+
 ## 1. Azure CLIのコマンド非推奨・バージョン差異
 ### 🚨 事象
 Azure Container AppsへのIP制限追加時、ドキュメントにあった `az containerapp ingress access-restriction add` や `show` コマンドが認識されずエラーとなった。

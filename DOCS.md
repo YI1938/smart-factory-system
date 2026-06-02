@@ -1,24 +1,20 @@
 ## 概要
 
-このリポジトリは、シンプルな生産ライン監視（Production Monitoring）サンプルです。3 層アーキテクチャ（Application / Infrastructure / Presentation）で構成され、設備の稼働状態、停止理由、実績を管理します。
+このリポジトリは「生産ライン監視」のサンプル実装です。3 層アーキテクチャ（Application / Infrastructure / Presentation）で設計され、設備の稼働状態管理、停止理由の保持、実績（良品 / 不良品）の記録・表示を行います。
 
-## プロジェクト構成（主要ファイル）
+## リポジトリ構成（主要ファイル）
 
 - [SmartFactorySystem.slnx](SmartFactorySystem.slnx)
 - Application/
-    - [Class1.cs](Application/Class1.cs)
-    - [IMachineRepository.cs](Application/IMachineRepository.cs)
-    - [MachineService.cs](Application/MachineService.cs)
-    - [MachineStatus.cs](Application/MachineStatus.cs)
+    - [Models/MachineStatus.cs](Application/Models/MachineStatus.cs)
+    - [Interfaces/IMachineRepository.cs](Application/Interfaces/IMachineRepository.cs)
+    - [Services/MachineService.cs](Application/Services/MachineService.cs)
     - [SmartFactorySystem.Application.csproj](Application/SmartFactorySystem.Application.csproj)
-
 - Infrastructure/
-    - [Class1.cs](Infrastructure/Class1.cs)
-    - [FactoryDbContext.cs](Infrastructure/FactoryDbContext.cs)
-    - [MachineRepository.cs](Infrastructure/MachineRepository.cs)
+    - [Data/FactoryDbContext.cs](Infrastructure/Data/FactoryDbContext.cs)
+    - [Repositories/MachineRepository.cs](Infrastructure/Repositories/MachineRepository.cs)
     - [Migrations/](Infrastructure/Migrations/)
     - [SmartFactorySystem.Infrastructure.csproj](Infrastructure/SmartFactorySystem.Infrastructure.csproj)
-
 - Presentation/
     - [appsettings.json](Presentation/appsettings.json)
     - [appsettings.Development.json](Presentation/appsettings.Development.json)
@@ -28,59 +24,74 @@
         - Pages: [MachineList.razor](Presentation/Components/Pages/MachineList.razor), [Home.razor](Presentation/Components/Pages/Home.razor)
     - [SmartFactorySystem.Presentation.csproj](Presentation/SmartFactorySystem.Presentation.csproj)
 
-## 各ファイルの役割と動作（要点）
+## 各フォルダと主要ファイルの説明
 
-- ソリューション
-    - `SmartFactorySystem.slnx`: 3 プロジェクトを束ねる Visual Studio / dotnet ソリューション。
+### Application
+- `Application/Models/MachineStatus.cs`:
+    - アプリケーションのドメインモデル（POCO）。主要プロパティ: `Id`, `MachineId`, `MachineName`, `Status`, `StopReason`, `PlannedProductionCount`, `ActualProductionCount`, `DefectCount`, `LastUpdated`, `LastStatusChangedAt`。
+    - 追加の MES 拡張プロパティ: `CurrentWorkOrder`, `LastStartedAt`, `StandardCycleTimeSeconds`。
+    - 計算プロパティ: `ProgressRate`, `QualityRate`, `PerformanceRate` を備え、UI 表示用の算出値を提供します。
 
-- Application
-    - `Class1.cs` ([Application/Class1.cs](Application/Class1.cs)): テンプレートの空クラス（現状未使用のサンプル）。
-    - `IMachineRepository.cs` ([Application/IMachineRepository.cs](Application/IMachineRepository.cs)):
-        - データアクセスの抽象インターフェース。
-        - `GetAllAsync()`, `GetByIdAsync(id)`, `UpdateStatusAsync(id, status, stopReason?)`, `RecordProductionAsync(id, addedCount, addedDefectCount)` を定義。
-    - `MachineService.cs` ([Application/MachineService.cs](Application/MachineService.cs)):
-        - ビジネスロジック層。`IMachineRepository` を注入してデータ取得・更新を行う。
-        - `GetMachinesAsync()` で一覧を取得、`UpdateMachineStatusAsync(...)` でステータス更新（エラー時にログ出力）、`RecordProductionAsync(...)` で実績加算とログ出力を行う。
-    - `MachineStatus` モデル（ソースはプロジェクト内にクラスファイルとして見つからない場合がありますが、スキーマはマイグレーションに定義されています。主なプロパティは下記）：
-        - Id, MachineId, MachineName, Status, StopReason, PlannedProductionCount, ActualProductionCount, DefectCount, LastUpdated, LastStatusChangedAt
-        - スキーマ詳細は [Infrastructure/Migrations/FactoryDbContextModelSnapshot.cs](Infrastructure/Migrations/FactoryDbContextModelSnapshot.cs) を参照してください。
+- `Application/Interfaces/IMachineRepository.cs`:
+    - データアクセスの抽象インターフェース。定義メソッド:
+        - `GetAllAsync()` — 全設備一覧取得
+        - `GetByIdAsync(id)` — 単一設備取得
+        - `UpdateStatusAsync(id, status, stopReason?)` — ステータス（と停止理由）の更新
+        - `RecordProductionAsync(id, addedCount, addedDefectCount)` — 実績／不良の加算
 
-- Infrastructure
-    - `FactoryDbContext.cs` ([Infrastructure/FactoryDbContext.cs](Infrastructure/FactoryDbContext.cs)):
-        - EF Core の `DbContext`。
-        - `DbSet<MachineStatus> MachineStatuses` を公開し、エンティティの構成（最大長や必須項目、`StopReason` の追加など）と初期データ（サンプル3件）を定義する。
-    - `MachineRepository.cs` ([Infrastructure/MachineRepository.cs](Infrastructure/MachineRepository.cs)):
-        - `IMachineRepository` の具象実装。
-        - `GetAllAsync()` で全件取得、`GetByIdAsync()` で単一取得、`UpdateStatusAsync()` で状態／停止理由／更新時刻を更新、`RecordProductionAsync()` で実績・不良を加算する。
-    - `Migrations/`:
-        - EF Core のマイグレーションファイル群。スナップショットにはサンプルデータとスキーマが含まれます。
+- `Application/Services/MachineService.cs`:
+    - ビジネスロジック層。`IMachineRepository` と `ILogger<MachineService>` を注入して利用します。
+    - 主な公開メソッド:
+        - `GetMachinesAsync()` — 一覧取得
+        - `UpdateMachineStatusAsync(id, status, stopReason?)` — リポジトリ呼出しでステータス更新（ログは Presentation 層またはサービス側で行う方針に合わせて拡張可能）
+        - `RecordProductionAsync(id, addedCount, addedDefectCount)` — 実績の記録
 
-- Presentation (Blazor)
-    - `Program.cs` ([Presentation/Program.cs](Presentation/Program.cs)):
-        - アプリ起動処理、DI 登録、SQLite 接続設定（接続文字列キー `FactoryDb`）、自動マイグレーション適用（起動時に `db.Database.Migrate()` を呼ぶ）、Razor Components/Blazor の設定を行う。
-        - `IMachineRepository` → `MachineRepository`、`MachineService` をスコープ登録しているため、UI で注入して利用できる。
-    - `MachineList.razor` ([Presentation/Components/Pages/MachineList.razor](Presentation/Components/Pages/MachineList.razor)):
-        - 生産ラインの一覧表示ページ。
-        - `MachineService` を注入し、`GetMachinesAsync()` でロード、ボタンで `UpdateMachineStatusAsync()` を呼び出して状態更新を行い、再ロードする。
-    - レイアウト・共通コンポーネント（ナビ・Reconnect モーダルなど）は UI とリアルタイム再接続挙動を補助します。
+### Infrastructure
+- `Infrastructure/Data/FactoryDbContext.cs`:
+    - EF Core の `DbContext`。`DbSet<MachineStatus> MachineStatuses` を公開。
+    - `OnModelCreating` でカラム制約（長さ、必須）とシードデータ（3 件のサンプル）を定義。
 
-## ビルドと実行手順
+- `Infrastructure/Repositories/MachineRepository.cs`:
+    - `IMachineRepository` の具象実装。DB 操作は `FactoryDbContext` 経由で行う。
+    - 主なロジック:
+        - `GetAllAsync()` — 順番付きで一覧取得
+        - `GetByIdAsync(id)` — 単一取得
+        - `UpdateStatusAsync(id, status, stopReason?)` — 状態が変わった場合は `LastStatusChangedAt` を更新。`Running` の場合は `StopReason` をクリアし、`LastUpdated` を更新して保存。
+        - `RecordProductionAsync(id, addedCount, addedDefectCount)` — `ActualProductionCount` と `DefectCount` を加算し `LastUpdated` を更新して保存。
 
-1. リポジトリルートで復元とビルド:
+- `Infrastructure/Migrations/`:
+    - EF Core マイグレーションおよびスナップショットを格納。最新のスナップショット（`FactoryDbContextModelSnapshot.cs`）により、データベースの最終スキーマ（MES 拡張フィールドを含む）が確認できます。
 
-```bash
-dotnet restore
-dotnet build
-```
+### Presentation (Blazor)
+- `Presentation/Program.cs`:
+    - アプリケーション起動処理と DI 登録を行うエントリポイント。
+    - SQLite 接続は `appsettings.json` の `ConnectionStrings:FactoryDb` を使用（デフォルト: `Data Source=factory.db`）
+    - サービス登録例: `IMachineRepository` → `MachineRepository`, `MachineService` をスコープ登録。
+    - 起動時に `db.Database.Migrate()` を呼び、マイグレーションを自動適用する実装が含まれます（開発環境では便利ですが、本番では運用方針に合わせて調整してください）。
 
-2. Presentation（Blazor）を実行:
+- UI コンポーネント:
+    - `Presentation/Components/Pages/MachineList.razor` — メインの稼働モニター画面。`MachineService` を注入し、一覧取得・状態更新（理由付き）・進捗・品質表示を行います。
+    - レイアウト / 共通コンポーネントは `Presentation/Components/Layout/` に配置され、ナビゲーションや再接続モーダル等を提供します。
 
-```bash
-dotnet run --project Presentation/SmartFactorySystem.Presentation.csproj
-```
+### 動作の流れ（代表例）
 
-3. データベース初期化 / マイグレーション適用（必要時）:
+1. ブラウザで `MachineList` ページを開く。
+2. ページが `MachineService.GetMachinesAsync()` を呼び、`IMachineRepository.GetAllAsync()` 経由で DB から `MachineStatus` 一覧を取得する。
+3. ユーザーがボタン操作で状態を変更すると、`MachineService.UpdateMachineStatusAsync(...)` が呼ばれ、`MachineRepository.UpdateStatusAsync(...)` が DB を更新する。
+4. センサー／外部システムと連携する想定では、`RecordProductionAsync(...)` を使って実績を逐次加算します。
 
-```bash
-dotnet ef database update --project Infrastructure --startup-project Presentation
-```
+### データベーススキーマ（要約、スナップショット準拠）
+
+- テーブル: `MachineStatuses`
+    - `Id` (INTEGER PK)
+    - `MachineId` (TEXT, max 50, required)
+    - `MachineName` (TEXT, max 100, required)
+    - `Status` (TEXT, max 20, required)
+    - `StopReason` (TEXT, max 200, optional)
+    - `PlannedProductionCount` (INTEGER)
+    - `ActualProductionCount` (INTEGER)
+    - `DefectCount` (INTEGER)
+    - `LastUpdated` (TEXT / DateTime)
+    - `LastStatusChangedAt` (TEXT / DateTime)
+    - MES 拡張: `CurrentWorkOrder` (TEXT), `LastStartedAt` (TEXT / nullable), `StandardCycleTimeSeconds` (REAL)
+
